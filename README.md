@@ -105,4 +105,4 @@ This project is built for educational and research purposes as a bootcamp final 
 
 ## 👤 Author
 
-Built by **Abdullah Mehar**
+Built by **Muzammal Mehar**
