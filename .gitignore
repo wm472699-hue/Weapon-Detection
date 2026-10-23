@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+users.json
+.streamlit/secrets.toml
+*.code-workspace
+.env
