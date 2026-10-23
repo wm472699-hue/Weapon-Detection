@@ -17,10 +17,19 @@ from types import SimpleNamespace
 # ------------------------------------------------------------------
 # CONFIG
 # ------------------------------------------------------------------
-ROBOFLOW_API_KEY = "c4rtJieiUdsZTiztYMgR"
+def _get_secret(name, default=""):
+    """Reads a secret from Streamlit secrets (.streamlit/secrets.toml locally,
+    the Secrets box on Streamlit Cloud), then falls back to an environment
+    variable. Keys therefore never need to be written inside this file."""
+    try:
+        return st.secrets[name]
+    except Exception:
+        return os.environ.get(name, default)
+
+ROBOFLOW_API_KEY = _get_secret("ROBOFLOW_API_KEY")
 ROBOFLOW_MODEL_ID = "gun-mmmct-sck1h"
 ROBOFLOW_MODEL_VERSION = "1"
-N8N_WEBHOOK_URL = "https://mehar333.app.n8n.cloud/webhook/weapon-alert"
+N8N_WEBHOOK_URL = _get_secret("N8N_WEBHOOK_URL")
 
 ROBOFLOW_URL = f"https://detect.roboflow.com/{ROBOFLOW_MODEL_ID}/{ROBOFLOW_MODEL_VERSION}"
 
@@ -55,6 +64,20 @@ def auto_connect_camera(ip, username, password, port=554, progress_callback=None
     one that actually opens and delivers a frame. Returns an object with:
     .success (bool), .url (str or None), .tried (list of labels), .diagnostic (str)."""
     tried = []
+
+    import socket
+    try:
+        with socket.create_connection((ip, int(port)), timeout=3):
+            pass
+    except Exception:
+        return SimpleNamespace(
+            success=False, url=None, tried=tried,
+            diagnostic=(
+                f"Could not reach {ip} on port {port}. Check the IP address and port, "
+                "and make sure this computer and the camera are on the same WiFi/network."
+            ),
+        )
+
     for brand_label, path in _COMMON_RTSP_PATHS:
         if progress_callback:
             progress_callback(f"Trying {brand_label} path...")
@@ -811,6 +834,13 @@ if not st.session_state.authenticated:
 st.title("🛡️ ArgusAI — Weapon Detection Dashboard")
 st.write(f"Logged in as **{st.session_state.current_user}** — upload a photo, take a live picture, upload a video, or connect a live CCTV camera to detect weapon-like objects.")
 
+if not ROBOFLOW_API_KEY:
+    st.error(
+        "Roboflow API key is not configured. Add ROBOFLOW_API_KEY to "
+        ".streamlit/secrets.toml (local) or to the Secrets box on Streamlit Cloud, then reload."
+    )
+    st.stop()
+
 # ------------------------------------------------------------------
 # SESSION STATE
 # ------------------------------------------------------------------
@@ -1252,6 +1282,7 @@ elif mode == "Upload Video":
     if uploaded_video is not None:
         tfile = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4")
         tfile.write(uploaded_video.read())
+        tfile.close()
         st.video(tfile.name)
         if st.button("Run Detection on Video"):
             run_live_stream(tfile.name, conf_slider, "Video Upload", skip_frames=10)
